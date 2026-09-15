@@ -194,6 +194,7 @@ personalized-content-ranking/
 ├── scripts/
 │   ├── build_item_neighbors.py     # rebuild neighbours + id maps
 │   ├── evaluate.py                 # warm evaluation → leaderboard (--seen-set)
+│   ├── evaluate_cold.py            # cold benchmark, full-catalog candidates
 │   ├── seen_set_ablation.py        # measures the seen-set asymmetry
 │   └── segment_recall_at_r.py      # Recall@R by history bucket
 ├── tests/test_metrics.py           # assertion-backed metric tests
@@ -224,7 +225,8 @@ per-user chronological splits to `data/processed/`. After that:
 
 ```bash
 python scripts/build_item_neighbors.py   # item_neighbors.npz + id_maps.npz
-python scripts/evaluate.py               # leaderboard + segment analysis
+python scripts/evaluate.py               # warm leaderboard + segment analysis
+python scripts/evaluate_cold.py          # cold benchmark over the full catalog
 ```
 
 **On artifact integrity.** Every model here indexes matrices and embeddings by

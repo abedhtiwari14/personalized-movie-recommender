@@ -3,12 +3,13 @@
 Everything you need to score a new recommender against both benchmarks. No
 modelling guidance here by design.
 
-**Repo state note:** `src/models/content.py` and
-`scripts/build_content_features.py` already exist from earlier in this
-session, along with two built feature matrices in `data/processed/`. Delete
-them if you want a clean slate — nothing in `src/data/`, `src/utils/`, or the
-other models imports them. `scripts/evaluate_content.py` does, so remove that
-too if you delete the model.
+**Repo state note:** the working tree has no content model — `src/models/`
+holds only `popularity.py`, `item_knn.py` and `bpr.py`, and `data/processed/`
+has no content artifacts. An earlier attempt (`content.py`,
+`build_content_features.py`, `evaluate_content.py`, plus its feature matrices
+and leaderboards) was committed in `69df5ca` and then removed, so it is
+recoverable from history if you ever want to compare. Nothing in the working
+tree imports or references it.
 
 ---
 
@@ -221,6 +222,12 @@ Sanity-check a new model against these. Both benchmarks, k=10.
 Warm figures are the full 193,622 users under the consistent seen-set. The
 three zeroes are structural, not weakness: a cold item has no popularity
 count, no neighbour row and no embedding row.
+
+Regenerate them with `python scripts/evaluate.py` (warm, ~5 min) and
+`python scripts/evaluate_cold.py` (cold, ~20 s). The cold script is also the
+shortest worked example of the harness — three recommenders defined as
+lambdas, passed straight to `evaluate_cold`. Read it before wiring up your
+own.
 
 On a 20,000-user prefix, Item-KNN warm R@10 reads 0.0758 rather than 0.0749 —
 that gap is sampling, not a bug, so compare like-for-like.
