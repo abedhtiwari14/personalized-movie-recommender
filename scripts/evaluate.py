@@ -7,8 +7,17 @@ Run from the project root:
 Regenerates `data/processed/leaderboard.csv`, the per-user recall arrays, and
 the corrected segment analysis. Every number is computed here — nothing is
 carried over as a literal.
+
+    --seen-set consistent   (default) every model excludes the user's full
+                            training history, so all three rank the same
+                            candidate set.
+    --seen-set legacy       Item-KNN excludes only positively-rated history.
+                            Reproduces the originally published numbers;
+                            handicaps Item-KNN by ~16% relative (see
+                            scripts/seen_set_ablation.py).
 """
 
+import argparse
 import os
 import sys
 import time
@@ -62,8 +71,10 @@ def evaluate(recommend, users, relevant_by_user, label):
     return recalls, precisions, ndcgs
 
 
-def main():
+def main(seen_set="consistent"):
     started = time.time()
+
+    print(f"Seen-set protocol: {seen_set}\n", flush=True)
 
     print("Loading splits...", flush=True)
     train = loaders.load_split("train")
@@ -75,10 +86,11 @@ def main():
     # Evaluation targets: each user's positive test interactions.
     relevant_by_user = loaders.relevant_by_user(test)
 
-    # Seen sets. Popularity and BPR exclude the user's entire training
-    # history; Item-KNN excludes only the positive part. That asymmetry is
-    # inherited from the published run and is quantified in
-    # scripts/seen_set_ablation.py.
+    # Seen sets. Under the consistent protocol every model excludes the
+    # user's full training history, so all three rank the same candidates.
+    # Under `legacy`, Item-KNN excludes only the positively-rated part —
+    # the originally published behaviour, which lets it spend top-K slots on
+    # movies the user already rated below 4 and costs it ~16% relative.
     seen_all = train.groupby("userId")["movieId"].apply(set)
     history = loaders.positive_movies_by_user(train_positive)
 
@@ -99,8 +111,14 @@ def main():
         users, relevant_by_user, "Popularity",
     )
 
+    def knn_seen(user_id):
+        if seen_set == "legacy":
+            return None
+
+        return seen_all.get(user_id, empty)
+
     knn_scores = evaluate(
-        lambda u: item_knn.recommend(history.get(u, empty), k=K),
+        lambda u: item_knn.recommend(history.get(u, empty), k=K, seen=knn_seen(u)),
         users, relevant_by_user, "Item-KNN",
     )
 
@@ -183,7 +201,8 @@ def main():
 
     for name, recommend in (
         ("BPR (MF)", lambda u: bpr.recommend(u, seen=seen_all.get(u, empty), k=K)),
-        ("Item-KNN", lambda u: item_knn.recommend(history.get(u, empty), k=K)),
+        ("Item-KNN", lambda u: item_knn.recommend(history.get(u, empty), k=K,
+                                                   seen=knn_seen(u))),
     ):
         ranks = []
         distinct = set()
@@ -207,4 +226,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--seen-set",
+        choices=["consistent", "legacy"],
+        default="consistent",
+        help="which candidates each model excludes (default: consistent)",
+    )
+    main(parser.parse_args().seen_set)

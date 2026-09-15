@@ -102,6 +102,40 @@ def load_id_maps():
         return {key: data[key] for key in data.files}
 
 
+def full_universe(movies=None):
+    """Every movieId in the catalog, sorted.
+
+    The warm benchmark ranks within the 43,417 movies that have positive
+    training interactions. That universe contains no cold items by
+    construction, so it cannot measure item cold-start at all. The cold
+    evaluation ranks within the full catalog instead, where a newly released
+    film competes against every other unwatched title rather than only
+    against titles somebody already liked.
+    """
+    movies = load_movies() if movies is None else movies
+
+    return np.sort(movies["movieId"].unique())
+
+
+def warm_universe(train_positive):
+    """Movies with at least one positive training interaction (43,417)."""
+    return np.asarray(train_positive["movieId"].unique())
+
+
+def cold_items(train_positive, test_frame):
+    """Test targets with zero positive training signal.
+
+    These are the items no behavioural model can rank: they have no
+    embedding row, no neighbour row, and a popularity count of zero.
+    """
+    warm = set(warm_universe(train_positive).tolist())
+    test_positive = positives(test_frame)
+
+    return np.sort(
+        test_positive.loc[~test_positive["movieId"].isin(warm), "movieId"].unique()
+    )
+
+
 def positive_movies_by_user(train_positive):
     """user id -> set of positively-interacted training movie ids."""
     return (
