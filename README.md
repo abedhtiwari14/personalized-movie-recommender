@@ -1,6 +1,6 @@
 # Personalized Movie Recommendation System
 
-An end-to-end Top-K recommendation system built on MovieLens 32M, benchmarking four
+An end-to-end Top-K recommendation system built on MovieLens 32M, benchmarking five
 approaches under a leakage-audited temporal evaluation protocol.
 
 **Result:** Item-KNN reaches Recall@10 of 0.0749 across 193,622 users, beating a popularity
@@ -57,7 +57,7 @@ is less production-realistic than a single cutoff.
 
 All three are covered by assertion-backed tests in `tests/test_metrics.py`.
 
-## The four approaches
+## The five approaches
 
 Everything below runs from `src/` and `scripts/`; the notebooks are the exploratory record.
 Metrics are unit-tested, and the full four-model evaluation reproduces from two commands.
@@ -90,6 +90,16 @@ Tags are kept as whole tokens rather than split into words. A word-level tokeniz
 tag volume, so a movie tagged `classic` 500 times does not outweigh one tagged it twice by
 250×; without it, raw counts quietly rebuild a popularity ranker out of content features.
 
+**Two-tower.** A neural retrieval model: an item tower maps content features to a 64-d
+embedding, a user tower maps a user id to the same space, and the score is their dot product.
+Trained with the same pairwise loss as BPR, so the supervision is collaborative even though the
+item side only ever sees genres and tags.
+
+The item tower takes no per-item learned id, which is what lets it embed a movie it never saw
+in training. Item embeddings are independent of the user, so the whole catalog is encoded once
+and each user becomes a single matrix multiply against that cache — the same split that lets
+two-tower models be served from an ANN index in production.
+
 ### The same movie, seen two ways
 
 Item-KNN and the content model disagree about what "similar to *The Shawshank Redemption*"
@@ -112,9 +122,11 @@ have few tags, so a single token like `prison` dominates their vector.
 
 | Model | Recall@10 | Precision@10 | NDCG@10 |
 |---|---|---|---|
+| Two-tower (popularity-sampled negatives) | 0.0400 | 0.0274 | 0.0374 |
 | Popularity | 0.0480 | 0.0382 | 0.0530 |
 | Content (genres + tags) | 0.0522 | 0.0447 | 0.0610 |
 | BPR (Matrix Factorization) | 0.0543 | 0.0421 | 0.0584 |
+| Two-tower (uniform negatives) | 0.0576 | 0.0448 | 0.0611 |
 | **Item-KNN (item-item CF)** | **0.0749** | **0.0563** | **0.0793** |
 
 Personalization works: BPR beats the baseline by 13.2%. But the simple neighbour-based method
@@ -123,6 +135,10 @@ beats the learned one by 37.9%, and the baseline by 56.1%. A Wilcoxon signed-ran
 
 The headline is that the more complicated model lost. Squeezing a user's taste into 64 numbers
 throws away detail that item-to-item similarity keeps.
+
+The two-tower is the best of the learned models at 0.0576, ahead of BPR and the content model,
+and still well short of item-KNN. Adding depth and content features to matrix factorization
+helped, but not enough to overtake a neighbourhood method.
 
 The content model is the quiet surprise. With no behavioural signal whatsoever it beats the
 baseline on all three metrics, and **outranks BPR on Precision@10 and NDCG@10** despite lower
@@ -144,11 +160,16 @@ act as distractors so the task is not artificially easy.
 | Popularity | 0.0000 | 0 | 0.0154 |
 | Item-KNN | 0.0000 | 0 | 0.0224 |
 | BPR (MF) | 0.0000 | 0 | 0.0166 |
+| Two-tower (uniform negatives) | 0.0000 | 0 | 0.0170 |
+| Two-tower (popularity-sampled) | 0.0001 | 1 | 0.0066 |
 | **Content (genres + tags)** | **0.0017** | **13** | 0.0183 |
 
 The three behavioural models score **exactly zero**, by construction rather than by weakness: a
 cold movie has no popularity count, no neighbour row and no embedding row. No amount of tuning
 changes that.
+
+The two-tower was built specifically to close this gap — its item tower can embed a movie it
+never trained on — and it did not. Why is the fourth finding below.
 
 Stated honestly, 13 hits out of 10,411 is a rounding error, and content does not *solve*
 cold-start. What it does is move the number off zero, which nothing else here can. The
@@ -159,7 +180,7 @@ already engaged — full coverage on the top 1,000 movies by popularity, about 7
 Tags are closer to behaviour wearing content clothing than to true metadata. Genres are the part
 genuinely available the day a film is released.
 
-## Three things that went wrong
+## Four things that went wrong
 
 These were the most useful part of the project.
 
@@ -244,6 +265,45 @@ whose sizes disagree — making the failure impossible rather than merely unlike
 **Lesson: a file of row numbers means nothing without the list it refers to, so they belong
 together.**
 
+### 4. A model that learned popularity from content alone
+
+The two-tower was built to rank cold items: its item tower reads only genres and tags, so it
+can embed a movie that never appeared in training. On the cold benchmark it surfaced **zero**
+items, exactly like the behavioural models it was supposed to beat.
+
+The item tower never sees an item id or an interaction count. It had still learned popularity:
+
+```
+Spearman(predicted score, training frequency), warm items:  +0.616
+median rank of a cold item, out of 87,585             :  42,518
+best-ranked cold item                                 :   2,025
+```
+
+Content patterns that appeared often as positives were pushed up. Cold items have no training
+positives by definition, so their content signature maps to low scores.
+
+**The tested fix.** Negatives were drawn uniformly, so a popular movie appeared constantly as a
+positive and rarely as a negative — the model correctly inferred that content like it is good.
+Sampling negatives in proportion to popularity (exponent 0.75) puts popular items on both sides
+of the comparison, which should cancel the signal.
+
+It did. The correlation fell from +0.616 to **+0.083**, cold items in the global top 1,000 went
+from 0 to 10, and the best cold rank improved from 2,025 to 584. The mechanism was confirmed.
+
+And the model got worse at everything. Warm Recall@10 dropped from 0.0576 to 0.0400, below the
+popularity baseline. Cold items surfaced went from 0 to 1.
+
+**The popularity signal was real, not spurious.** Popular movies genuinely are more likely to be
+watched next; removing that information removed predictive signal and bought almost nothing,
+because content alone still cannot lift a cold item into the top 10 of 87,585 candidates.
+
+The broader pattern: three models, three different routes to the same failure. BPR through a
+per-item bias term. TF-IDF through raw term counts, prevented by sublinear scaling. The
+two-tower through the content features themselves.
+
+**Lesson: an unbiased model is not automatically a better one. Confirm the mechanism, then
+measure whether removing it helps.**
+
 ## Scope
 
 Candidates are the 43,417 movies with training history, not the full 87,585-movie catalog.
@@ -277,6 +337,8 @@ python scripts/build_item_neighbors.py   # item neighbours + id mappings
 python scripts/evaluate.py               # warm benchmark, three behavioural models
 python scripts/evaluate_cold.py          # cold benchmark, three behavioural models
 python scripts/evaluate_content.py       # content model, warm and cold
+python scripts/train_two_tower.py        # two-tower (--negatives uniform|popularity)
+python scripts/evaluate_two_tower.py     # two-tower, warm and cold
 ```
 
 Every model indexes matrices and embeddings by row position, so the position → movieId mapping
