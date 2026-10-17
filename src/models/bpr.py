@@ -1,15 +1,11 @@
 """BPR matrix factorization.
 
-Score is `u . i + b_i`: 64-dim user and movie embeddings plus a per-item
-bias, trained on `(user, positive item, sampled unobserved item)` triples
-with the pairwise loss `-log sigmoid(score_pos - score_neg)`. Implemented in
-PyTorch, but it is not a neural network — the scoring function has no hidden
-layers.
+Score is `u . i + b_i`, trained on (user, positive, sampled negative)
+triples with the pairwise loss `-log sigmoid(score_pos - score_neg)`.
+A dot product with no hidden layers.
 
-Initialization matters here and is not a detail: at `std=0.01` the embedding
-dot product and the gradients into it both start near zero while the bias
-receives a full-sized gradient, so training collapses into a popularity
-ranker with embedding norms of 0.0000. See the README.
+init_std matters: at 0.01 the embedding gradients start near zero while the
+bias gradient does not, and training degenerates into a popularity ranker.
 """
 
 import os
@@ -58,11 +54,7 @@ def bpr_loss(positive_scores, negative_scores):
 
 
 def embedding_health(model):
-    """Norms that distinguish a trained model from a collapsed one.
-
-    A collapsed run shows embedding norms at 0.0000 against a bias std near
-    0.54 — the check that caught the silent failure.
-    """
+    """Mean embedding norms and bias spread; near-zero norms indicate collapse."""
     return {
         "user_norm": model.user_embedding.weight.norm(dim=1).mean().item(),
         "movie_norm": model.movie_embedding.weight.norm(dim=1).mean().item(),
@@ -129,8 +121,8 @@ class BPRRecommender:
         ]
         scores[seen_indices] = -np.inf
 
-        # argpartition is safe here: exact ties between real scores are
-        # measure-zero, and masked entries never reach the top k.
+        # argpartition is safe: exact score ties are vanishingly unlikely and
+        # masked entries never reach the top k.
         top = np.argpartition(scores, -k)[-k:]
         top = top[np.argsort(scores[top])[::-1]]
 

@@ -1,14 +1,11 @@
-"""Item-item collaborative filtering over behavioural co-occurrence.
+"""Item-item collaborative filtering.
 
-Builds a sparse user x movie matrix from positive training interactions,
-transposes into movie space, and takes cosine nearest neighbours between
-movies. Neighbours are precomputed offline so that serving a recommendation
-is a lookup-and-aggregate rather than a similarity computation.
+Cosine similarity between movies over a sparse user x movie matrix of
+positive interactions. Neighbours are precomputed offline, so serving is a
+lookup and aggregate.
 
-The neighbour artifact is stored as a single .npz carrying `movie_ids`
-alongside `indices` and `similarities`. Neighbour rows are positions in
-`movie_ids`, so the two cannot be separated — storing them apart is what
-produced the stale-artifact bug this module was extracted to fix.
+The artifact stores `indices`, `similarities` and `movie_ids` in one .npz:
+neighbour rows are positions in `movie_ids` and are meaningless without it.
 """
 
 import os
@@ -29,10 +26,7 @@ def neighbors_path():
 
 
 def build_user_movie_matrix(train_positive, user_ids, movie_ids):
-    """Sparse CSR matrix of positive interactions (users x movies).
-
-    Dense would be ~8.7 billion cells; the matrix is ~0.13% occupied.
-    """
+    """Sparse CSR matrix of positive interactions (users x movies)."""
     user_to_idx = index_map(user_ids)
     movie_to_idx = index_map(movie_ids)
 
@@ -47,10 +41,10 @@ def build_user_movie_matrix(train_positive, user_ids, movie_ids):
 
 
 def build_neighbors(train_positive, user_ids, movie_ids, n_neighbors=N_NEIGHBORS):
-    """Precompute the cosine nearest neighbours of every movie.
+    """Cosine nearest neighbours of every movie.
 
-    Returns (indices, similarities), both shape (len(movie_ids), n_neighbors).
-    Each row's first entry is the movie itself at similarity 1.0.
+    Returns (indices, similarities), shape (len(movie_ids), n_neighbors).
+    Each row's first entry is normally the movie itself at similarity 1.0.
     """
     user_movie = build_user_movie_matrix(train_positive, user_ids, movie_ids)
     movie_user = user_movie.T.tocsr()
@@ -121,11 +115,8 @@ class ItemKNN:
     def recommend(self, history, k=10, seen=None):
         """Rank unseen movies by summed similarity to the user's history.
 
-        `history` is the user's positive training movies. `seen` is what to
-        exclude; it defaults to the history itself, which is the convention
-        the published results were produced under. Passing the user's full
-        training history (including negatively-rated items) makes the
-        exclusion consistent with the popularity and BPR recommenders.
+        `seen` defaults to the history itself; pass the full training
+        history to match the exclusion used by the other recommenders.
         """
         seen = set(history) if seen is None else set(seen)
 

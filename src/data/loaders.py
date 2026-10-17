@@ -1,11 +1,8 @@
-"""Loading the processed splits and the canonical id mappings.
+"""Processed splits and the canonical position <-> id mappings.
 
-Every model in this project indexes matrices and embeddings by *position*,
-not by movieId. The position -> movieId mapping is therefore part of the
-model, and a saved artifact that does not carry its own mapping is unusable.
-An earlier version of this project saved item neighbours without one, against
-a mapping that was later rebound — the neighbours silently pointed into a
-different id space. Everything here exists to make that unrepresentable.
+Models index matrices and embeddings by row position, so the
+position -> movieId mapping is part of the model and must travel with any
+artifact that stores positions.
 """
 
 import os
@@ -20,8 +17,7 @@ MODELS_DIR = os.path.join(PROJECT_ROOT, "models")
 
 SPLITS = ("train", "validation", "test")
 
-# Positive interaction threshold. Ratings below this are not negatives —
-# they simply carry no positive signal (see README, "Dataset").
+# Ratings below this carry no positive signal; they are not negatives.
 POSITIVE_RATING = 4.0
 
 
@@ -35,8 +31,7 @@ def split_path(split):
 def load_split(split, columns=("userId", "movieId", "positive")):
     """Load one per-user chronological split.
 
-    Row order is the global chronological order the splits were written in,
-    and the id mappings below depend on it — do not sort the result.
+    Row order is chronological and build_id_maps depends on it; do not sort.
     """
     return pd.read_parquet(split_path(split), columns=list(columns))
 
@@ -51,18 +46,14 @@ def positives(frame):
 
 
 def build_id_maps(train_positive):
-    """Derive the canonical position <-> id mappings from positive training data.
+    """Position <-> id mappings derived from positive training data.
 
-    Two distinct user orderings exist and both must be preserved exactly, or
-    the saved BPR checkpoint becomes meaningless:
+    Three mappings, and the orderings are not interchangeable:
 
-    - `movie_ids`: order of first appearance in the training split. Indexes
-      the Item-KNN item axis *and* the BPR movie embedding rows.
-    - `knn_user_ids`: order of first appearance. Indexes the Item-KNN user
-      axis, which is only a feature axis for cosine similarity — its order
-      does not affect results.
-    - `bpr_user_ids`: sorted ascending (a groupby side effect at training
-      time). Indexes the BPR user embedding rows.
+    movie_ids    order of first appearance; indexes the Item-KNN item axis
+                 and the BPR movie embedding rows
+    knn_user_ids order of first appearance; Item-KNN user axis only
+    bpr_user_ids sorted ascending; indexes the BPR user embedding rows
     """
     movie_ids = train_positive["movieId"].unique()
     knn_user_ids = train_positive["userId"].unique()
@@ -103,31 +94,19 @@ def load_id_maps():
 
 
 def full_universe(movies=None):
-    """Every movieId in the catalog, sorted.
-
-    The warm benchmark ranks within the 43,417 movies that have positive
-    training interactions. That universe contains no cold items by
-    construction, so it cannot measure item cold-start at all. The cold
-    evaluation ranks within the full catalog instead, where a newly released
-    film competes against every other unwatched title rather than only
-    against titles somebody already liked.
-    """
+    """Every movieId in the catalog, sorted. Candidate set for cold evaluation."""
     movies = load_movies() if movies is None else movies
 
     return np.sort(movies["movieId"].unique())
 
 
 def warm_universe(train_positive):
-    """Movies with at least one positive training interaction (43,417)."""
+    """Movies with at least one positive training interaction."""
     return np.asarray(train_positive["movieId"].unique())
 
 
 def cold_items(train_positive, test_frame):
-    """Test targets with zero positive training signal.
-
-    These are the items no behavioural model can rank: they have no
-    embedding row, no neighbour row, and a popularity count of zero.
-    """
+    """Test targets with no positive training interactions."""
     warm = set(warm_universe(train_positive).tolist())
     test_positive = positives(test_frame)
 

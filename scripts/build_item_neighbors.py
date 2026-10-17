@@ -1,11 +1,8 @@
-"""Rebuild the Item-KNN neighbour artifact and the canonical id mappings.
+"""Rebuild the Item-KNN neighbour artifact and the id mappings.
 
-Run from the project root:
+Writes data/processed/item_neighbors.npz and id_maps.npz.
 
     python scripts/build_item_neighbors.py
-
-Writes `data/processed/item_neighbors.npz` (indices + similarities +
-movie_ids in one file) and `data/processed/id_maps.npz`.
 """
 
 import os

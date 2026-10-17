@@ -1,12 +1,8 @@
 """Recall@R by user-history bucket, under the consistent seen-set protocol.
 
-Recall@K is capped at K / len(relevant), so it cannot be compared across
-buckets whose users have very different target counts. Recall@R sizes the
-list to each user's own target count and removes that ceiling. Together with
-Precision@10 it is the evidence that Item-KNN performs *better* on users with
-more history, not worse.
-
-Run from the project root:
+Recall@K is capped at K / len(relevant) and so is not comparable across
+buckets with different target counts. Recall@R sizes the list to each
+user's target count and removes that ceiling.
 
     python scripts/segment_recall_at_r.py [n_users]
 """

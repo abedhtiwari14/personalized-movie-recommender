@@ -1,18 +1,10 @@
 """Cold benchmark for the behavioural models.
 
-Run from the project root:
+Scores Popularity, Item-KNN and BPR over the full catalog for users with at
+least one test target that has no training signal. All three score zero: a
+cold item has no popularity count, no neighbour row and no embedding row.
 
     python scripts/evaluate_cold.py
-
-Scores Popularity, Item-KNN and BPR on the cold benchmark: 3,479 users who
-have at least one test target with zero positive training interactions,
-ranking the full 87,585-movie catalog.
-
-All three score exactly zero, and that is the point. A cold item has no
-popularity count, no neighbour row and no embedding row, so the result is
-structural rather than a matter of tuning. This script exists to keep that
-claim reproducible, and to serve as a worked example of the evaluation
-harness — a recommender is just Callable[[int], Sequence[int]].
 """
 
 import os

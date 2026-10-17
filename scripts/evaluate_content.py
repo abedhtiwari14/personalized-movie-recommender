@@ -1,22 +1,8 @@
 """Warm and cold evaluation of the content-based model.
 
-Run from the project root:
+Scoring is batched: one sparse matmul per BATCH users rather than per user.
 
     python scripts/evaluate_content.py
-
-Two evaluations, reported separately because they answer different questions.
-
-WARM  193,622 users ranking the 43,417 movies that have positive training
-      signal. Content is expected to lose here: the behavioural models have
-      strictly more information about every candidate.
-
-COLD  3,479 users who have at least one test target with zero positive
-      training interactions, ranking the full 87,585-movie catalog.
-      Popularity, item-KNN and BPR score exactly zero by construction.
-      This is the evaluation the content model exists for.
-
-Scoring is batched: one sparse matmul per BATCH users rather than one per
-user, which takes the warm run from ~19 min to a few.
 """
 
 import os

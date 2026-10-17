@@ -1,20 +1,17 @@
 """Ranking metrics for Top-K recommendation.
 
-All functions take a ranked list of recommended item ids (best first), a set
-of relevant item ids, and a cutoff K. They are order-sensitive only through
-NDCG; recall and precision depend on set overlap within the top K.
+Each function takes a ranked list of item ids (best first), a set of
+relevant ids, and a cutoff k.
 """
 
 import numpy as np
 
 
 def recall_at_k(recommended, relevant, k):
-    """Fraction of relevant items that appear in the top-k recommendations.
+    """Fraction of relevant items appearing in the top k.
 
-    Note the denominator is the user's own target count, so this metric is
-    capped at k / len(relevant). It is valid for comparing models on a fixed
-    population, not for comparing populations with different target counts.
-    See the README, "A segment finding that was a metric artifact".
+    Capped at k / len(relevant), so this is comparable across models on a
+    fixed population but not across populations with different target counts.
     """
     relevant = set(relevant)
 
@@ -37,10 +34,7 @@ def precision_at_k(recommended, relevant, k):
 
 
 def ndcg_at_k(recommended, relevant, k):
-    """Normalized Discounted Cumulative Gain with binary relevance.
-
-    The ideal ranking places min(len(relevant), k) hits in the top positions.
-    """
+    """NDCG with binary relevance; ideal ranking is min(len(relevant), k) hits."""
     relevant = set(relevant)
 
     if len(relevant) == 0:
@@ -66,10 +60,9 @@ def ndcg_at_k(recommended, relevant, k):
 
 
 def recall_at_r(recommended, relevant):
-    """Recall with the list length set to each user's own target count.
+    """Recall with the list length set to len(relevant).
 
-    Removes the denominator ceiling that makes recall_at_k incomparable
-    across user segments. `recommended` must already be at least
+    Removes the ceiling in recall_at_k. `recommended` must be at least
     len(relevant) items long.
     """
     relevant = set(relevant)

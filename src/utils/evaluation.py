@@ -1,21 +1,11 @@
-"""Benchmark harness: one interface, two benchmarks.
+"""Benchmark harness.
 
-A recommender is anything satisfying `Callable[[int], Sequence[int]]` — given
-a userId, return a ranked list of movieIds, best first. Nothing else is
-required of it. Both benchmarks below take that callable, so a new model is
-evaluated without touching this module.
+A recommender is any `Callable[[int], Sequence[int]]`: userId in, ranked
+movieIds out. Both benchmarks take that callable.
 
-    WARM  193,622 users ranking the 43,417 movies that have positive training
-          signal. Every candidate has behavioural history.
-
-    COLD  3,479 users who have at least one test target with zero positive
-          training interactions, ranking the full 87,585-movie catalog.
-          Popularity, Item-KNN and BPR score exactly zero here by
-          construction — no popularity count, no neighbour row, no embedding
-          row.
-
-The two are reported separately because they answer different questions, and
-a single blended number would hide both.
+    WARM  all evaluation users, ranking movies with positive training signal
+    COLD  users with at least one test target that has no training signal,
+          ranking the full catalog
 """
 
 import time
@@ -34,11 +24,7 @@ EMPTY = frozenset()
 
 @dataclass
 class EvaluationContext:
-    """Everything both benchmarks need, loaded once.
-
-    Loading costs ~40s and several GB, almost all of it the per-user seen
-    sets. Build one and reuse it across models.
-    """
+    """Shared evaluation state. Loading is slow; build one and reuse it."""
 
     relevant_by_user: pd.Series   # userId -> set of positive TEST movieIds
     history: pd.Series            # userId -> set of positive TRAIN movieIds
@@ -77,12 +63,7 @@ class EvaluationContext:
         return self.history.get(user_id, EMPTY)
 
     def seen_for(self, user_id):
-        """The user's full training history — what every model must exclude.
-
-        Excluding only the positive part lets a model spend top-K slots on
-        movies the user already rated below 4, and costs it ~16% relative.
-        Use this, not history_for, as the exclusion set.
-        """
+        """Full training history. Use this as the exclusion set, not history_for."""
         return self.seen.get(user_id, EMPTY)
 
     def cold_targets_for(self, user_id):
@@ -93,9 +74,8 @@ class EvaluationContext:
 def evaluate_warm(recommend, context, k=K, users=None, label="model", verbose=True):
     """Score a recommender on the warm benchmark.
 
-    `recommend` takes a userId and returns a ranked list of movieIds; it is
-    responsible for its own candidate restriction and seen-exclusion. Returns
-    aggregate means plus the per-user recall array for significance testing.
+    `recommend` handles its own candidate restriction and seen-exclusion.
+    Returns aggregate means plus the per-user recall array.
     """
     users = context.users if users is None else users
 
@@ -131,13 +111,9 @@ def evaluate_warm(recommend, context, k=K, users=None, label="model", verbose=Tr
 def evaluate_cold(recommend, context, k=K, label="model", verbose=True):
     """Score a recommender on the cold benchmark.
 
-    `cold_recall@k` counts only cold targets: of this user's test positives
-    that have no training signal, how many appear in the top k. It is the
-    metric no behavioural model can score above zero on.
-
-    `overall_recall@k` counts all of the user's test targets over the same
-    ranking, so a model that surfaces cold items at the cost of everything
-    else is visible rather than flattered.
+    cold_recall@k counts only cold targets; overall_recall@k counts all of
+    the user's targets over the same ranking, so trading one for the other
+    is visible.
     """
     cold_set = set(context.cold_items.tolist())
 

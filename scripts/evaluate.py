@@ -1,20 +1,13 @@
-"""Full test-set evaluation of all three models.
+"""Test-set evaluation of the three behavioural models.
 
-Run from the project root:
+Writes data/processed/leaderboard.csv, the per-user recall arrays and the
+segment analysis. All figures are computed at run time.
 
-    python scripts/evaluate.py
+    python scripts/evaluate.py [--seen-set consistent|legacy]
 
-Regenerates `data/processed/leaderboard.csv`, the per-user recall arrays, and
-the corrected segment analysis. Every number is computed here — nothing is
-carried over as a literal.
-
-    --seen-set consistent   (default) every model excludes the user's full
-                            training history, so all three rank the same
-                            candidate set.
-    --seen-set legacy       Item-KNN excludes only positively-rated history.
-                            Reproduces the originally published numbers;
-                            handicaps Item-KNN by ~16% relative (see
-                            scripts/seen_set_ablation.py).
+consistent (default) excludes each user's full training history for every
+model. legacy excludes only positively-rated history for Item-KNN, which
+reproduces the earlier published figures.
 """
 
 import argparse
@@ -86,11 +79,8 @@ def main(seen_set="consistent"):
     # Evaluation targets: each user's positive test interactions.
     relevant_by_user = loaders.relevant_by_user(test)
 
-    # Seen sets. Under the consistent protocol every model excludes the
-    # user's full training history, so all three rank the same candidates.
-    # Under `legacy`, Item-KNN excludes only the positively-rated part —
-    # the originally published behaviour, which lets it spend top-K slots on
-    # movies the user already rated below 4 and costs it ~16% relative.
+    # Under `consistent` every model excludes the user's full training
+    # history; under `legacy` Item-KNN excludes only the positive part.
     seen_all = train.groupby("userId")["movieId"].apply(set)
     history = loaders.positive_movies_by_user(train_positive)
 

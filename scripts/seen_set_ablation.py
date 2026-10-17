@@ -1,14 +1,8 @@
-"""Quantify the seen-set asymmetry between the three recommenders.
+"""Measure the seen-set asymmetry in Item-KNN.
 
-Popularity and BPR exclude a user's *entire* training history from their
-candidates. Item-KNN, as published, excludes only the positively-rated part,
-so it may recommend a movie the user already rated 2.0 in training. Those
-items are almost never in the test targets, so the asymmetry costs Item-KNN
-top-K slots — meaning the published Item-KNN number is, if anything, a
-slight understatement.
-
-This script measures the size of that effect rather than silently changing
-the headline. Run from the project root:
+Popularity and BPR exclude a user's full training history; Item-KNN as
+originally published excluded only the positively-rated part. This reports
+the size of that difference.
 
     python scripts/seen_set_ablation.py [n_users]
 """
