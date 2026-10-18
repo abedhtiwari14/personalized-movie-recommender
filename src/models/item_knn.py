@@ -11,8 +11,6 @@ neighbour rows are positions in `movie_ids` and are meaningless without it.
 import os
 
 import numpy as np
-from scipy.sparse import csr_matrix
-from sklearn.neighbors import NearestNeighbors
 
 from ..data.loaders import PROCESSED_DIR, index_map
 
@@ -27,6 +25,8 @@ def neighbors_path():
 
 def build_user_movie_matrix(train_positive, user_ids, movie_ids):
     """Sparse CSR matrix of positive interactions (users x movies)."""
+    from scipy.sparse import csr_matrix
+
     user_to_idx = index_map(user_ids)
     movie_to_idx = index_map(movie_ids)
 
@@ -46,6 +46,8 @@ def build_neighbors(train_positive, user_ids, movie_ids, n_neighbors=N_NEIGHBORS
     Returns (indices, similarities), shape (len(movie_ids), n_neighbors).
     Each row's first entry is normally the movie itself at similarity 1.0.
     """
+    from sklearn.neighbors import NearestNeighbors
+
     user_movie = build_user_movie_matrix(train_positive, user_ids, movie_ids)
     movie_user = user_movie.T.tocsr()
 
