@@ -20,7 +20,7 @@ EXPOSE 7860
 
 # Bind 0.0.0.0, not the loopback, or the container is unreachable from
 # outside it.
-ENV GRADIO_SERVER_NAME=0.0.0.0 \
-    GRADIO_SERVER_PORT=7860
+ENV GRADIO_SERVER_NAME=0.0.0.0
 
-CMD ["python", "app.py"]
+# Hosts that assign a port set $PORT; fall back to 7860 locally.
+CMD ["sh", "-c", "GRADIO_SERVER_PORT=${PORT:-7860} python app.py"]
