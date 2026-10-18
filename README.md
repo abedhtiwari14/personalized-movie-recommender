@@ -3,6 +3,10 @@
 An end-to-end Top-K recommendation system built on MovieLens 32M, benchmarking five
 approaches under a leakage-audited temporal evaluation protocol.
 
+**[Live demo](https://movie-recommender-u6vz.onrender.com)** — pick a few films and see the
+collaborative and content models disagree side by side. Free hosting, so the first request
+after a quiet spell takes about a minute to wake the service.
+
 **Result:** Item-KNN reaches Recall@10 of 0.0749 across 193,622 users, beating a popularity
 baseline by 56% and BPR matrix factorization by 38%. The simplest personalized model won. Two
 findings were retracted along the way, after their supporting evidence turned out to be
@@ -324,9 +328,15 @@ POST /recommend           {"liked": [318, 296], "k": 10} -> ranked titles
 ```
 
 ```bash
-docker build -t movie-recsys .
+docker build -t movie-recsys .            # JSON API
 docker run -p 8000:8000 movie-recsys
+
+docker build -f Dockerfile.demo -t movie-demo .   # Gradio UI
+docker run -p 7860:7860 movie-demo
 ```
+
+The Gradio image is what runs at the [live demo](https://movie-recommender-u6vz.onrender.com),
+deployed to Render from `render.yaml`.
 
 | Measured | |
 |---|---|
