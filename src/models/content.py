@@ -4,7 +4,6 @@ import os
 
 import numpy as np
 import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
 
 from src.data import loaders
 
@@ -70,6 +69,8 @@ def build_content_features(min_df=5, use_tags=True):
     Returns (features, movie_ids, vocabulary). Rows follow full_universe()
     order; tags are kept as whole tokens rather than split into words.
     """
+    from sklearn.feature_extraction.text import TfidfVectorizer
+
     movies = loaders.load_movies()
     movie_ids = loaders.full_universe(movies)
 
