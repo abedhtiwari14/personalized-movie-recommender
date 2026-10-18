@@ -311,6 +311,41 @@ Candidates are the 43,417 movies with training history, not the full 87,585-movi
 has not been used for that yet. BPR draws one uniform negative per positive. Ratings below 4
 carry no signal at all.
 
+## Serving
+
+The retrieval model runs behind a small FastAPI service. Neighbours are
+precomputed offline, so a request is a lookup and a weighted sum rather than a
+similarity computation.
+
+```
+GET  /health              liveness, and how many movies are loaded
+GET  /movies?q=matrix     title search over the rankable catalog
+POST /recommend           {"liked": [318, 296], "k": 10} -> ranked titles
+```
+
+```bash
+docker build -t movie-recsys .
+docker run -p 8000:8000 movie-recsys
+```
+
+| Measured | |
+|---|---|
+| Image size | 510 MB |
+| Resident memory | 130 MB |
+| Latency, p50 / p99 | 0.8 ms / 1.2 ms in-container, 150 requests |
+| Runtime dependencies | fastapi, uvicorn, numpy, pandas |
+| Runtime data | 26 MB neighbour artifact, 4 MB title map |
+
+scipy and scikit-learn build the neighbour artifact offline and are imported
+inside the build functions, so they stay out of the image; including the
+training stack would add roughly 2 GB for code that never runs on the request
+path.
+
+Not production: a single process with no caching or autoscaling, and the model
+is versioned only by filename. Serving this properly would mean item vectors in
+an ANN index, a load balancer, and a versioned artifact so rollback is a pointer
+change.
+
 ## Project layout
 
 ```
