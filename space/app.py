@@ -19,6 +19,9 @@ from src.models.item_knn import ItemKNN
 TOP_K = 10
 
 knn = ItemKNN.load("item_neighbors.npz")
+# Similarities are stored as float16 to keep the artifact small; summing them
+# across a long history needs float32 to avoid accumulating rounding error.
+knn.similarities = knn.similarities.astype(np.float32)
 
 with np.load("content_features.npz", allow_pickle=False) as blob:
     content_X = csr_matrix(

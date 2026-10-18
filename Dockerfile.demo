@@ -1,0 +1,26 @@
+# Public demo: the Gradio UI comparing collaborative and content ranking.
+# Dockerfile (without the suffix) serves the JSON API instead.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY space/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# src/ comes from the repo root rather than space/src/, which is generated
+# by scripts/build_space.py and not tracked. Copying it here would build
+# locally and fail on a clean clone.
+COPY src/ src/
+
+COPY space/app.py .
+COPY space/item_neighbors.npz space/content_features.npz ./
+COPY space/titles.csv space/picker.csv ./
+
+EXPOSE 7860
+
+# Bind 0.0.0.0, not the loopback, or the container is unreachable from
+# outside it.
+ENV GRADIO_SERVER_NAME=0.0.0.0 \
+    GRADIO_SERVER_PORT=7860
+
+CMD ["python", "app.py"]
